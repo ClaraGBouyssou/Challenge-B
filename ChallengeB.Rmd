@@ -262,7 +262,7 @@ MSE1<- apply(fitall1, 2, function(a){mean((a-yt)^2)})
 ```
 
 
-#Step 10
+##Step 10
 The following graph summarises how de MSE changes with respect to the bandwidth in the two samples i.e. blue for the training dataset and red for the test.
 It can be concluded that the MSE in the test dataset reaches a minimum for intermediate values of the bandwidht i.e. 0.2, instead in the training dataset the mean squared error is almost proportionally increasing with the bandwidth. Therefore it is preferable to use a value around the median of the bandwidth.
 ```{r, echo=FALSE, comment=NA}
@@ -324,6 +324,7 @@ cnil1<-cnil[ , -which(names(cnil) %in% c("one"))]
 colnames(cnil1)<-c("SIREN","Responsable", "Adresse", "Code_Postal", "Vile", "NAF", "TypeCIL", "Portee", "department")
 
 #We use this function to optimaze the reading of the huge dataset
+
 SIRC <- fread("C:/Users/clara/rprog/Challenge B/SIRC.csv")
 
 #In order to work with a vector of the more than 80Mb we used the following comand:
@@ -341,6 +342,26 @@ TEFEN2<-as.numeric(cnil2$TEFEN)
 
 #We plot the histogram
 graph4<-hist(TEFEN2)
-graph4
+```
+##Appendix
+Here there is the timing of the Task 3
+```{r, echo=FALSE, comment=NA}
+a<-system.time(CNIL)
+b<-system.time(department)
+c<-system.time(one)
+d<-system.time(cnil)
+e<-system.time(count1)
+f<-system.time(count2)
+g<-system.time(colnames(count2))
+h<-system.time(count3)
+i<-system.time(cnil1)
+j<-system.time(colnames(cnil1))
+k<-system.time(SIRC)
+l<-system.time(memory.limit(10000000))
+m<-system.time(cnil2)
+n<-system.time(TEFEN2)
+o<-system.time(graph4)
+z<-a+b+c+d+e+f+g+h+i+j+k+l+m+n+o
+z
 ```
 
