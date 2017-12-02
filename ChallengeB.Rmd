@@ -1,0 +1,346 @@
+---
+title: "Challenge B"
+author: "Cosma, Bianca & García Bouyssou, Clara"
+date: "December 2nd 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, eval=FALSE, include=FALSE}
+#install packages:
+install.packages("tidyverse")
+install.packages("gridExtra")
+install.packages("caret")
+install.packages("stringi")
+install.packages("np")
+install.packages("random.Forest")
+install.packages("dplyr")
+install.packages("readr")
+```
+
+```{r, include=FALSE}
+#require packages:
+require(tidyverse)
+require(gridExtra)
+require(caret)
+require(stringi)
+require(np)
+require(randomForest)
+require(dplyr)
+require(readr)
+require(data.table)
+```
+
+#Task 1B - Predicting house prices in Ames, Iowa (continued)
+
+```{r, include=FALSE}
+#We upload the datasets
+train<-read.csv(file="C:/Users/clara/rprog/Challenge B/train.csv",header=T,dec=",")
+test<-read.csv(file="C:/Users/clara/rprog/Challenge B/test.csv",header=T,dec=",")
+linearpredictions<-read.csv(file="C:/Users/clara/rprog/Challenge B/predictionBiancaClara.csv",header=T,dec=",")
+
+#Then we store the Id as a variable
+linear<-data.frame(linearpredictions)
+Id <- rownames(linear)
+linear <- cbind(Id=Id, linear)
+
+```
+##Step 1 
+Random forest algorithms are used for regression and classification models. Compare to other models it relies on fewer assumptions. The prediction is made on 2/3 of the training sample. This subsample is created by random selection of  cases(observations) with replacement and it is used to grown the trees. Then a subsample of inputs (independent variables) are selected at random. Afterwards the remaining part of the sample it is used to calculate the Out-Of-the-Bag (OOB) error rate. Each tree gives a classifation on the OOB, then the classification having the most votes is choosen. In the case is tackled here, a regression model, the classification is the average of the outcome(dependent variable).
+
+##Step 2
+A model is created with random forest and the results are presented below:
+```{r, include=FALSE}
+#We create a vector called SalePrice, with the same dimensions of a column of the test dataset
+
+SalePrice<-c(1:1459)
+
+#This new column is bounded with the dataset
+testcomp<-cbind(test, SalePrice)
+
+#So we can finally bind the rows of train and test
+total<-rbind(train, testcomp)
+
+#We apply the norm we applied in the last challenge to get rid of the variables with too many NA's, none variable with more than a 10% of NA's will remain in the dataset "total.improved"
+total.improved<-total[, -which(colMeans(is.na(total)) > 0.1)]
+
+
+#We then split again the test and the train, by the Id, and we eliminate the variable Id for both, and the SalePrice previously created in test2
+train1<-filter(total.improved, Id<1461)
+train2<-train1[ , -which(names(train1) %in% c("Id"))]
+
+test1<-filter(total.improved, Id>1460)
+test2<-test1[ , -which(names(test1) %in% c("SalePrice", "Id"))]
+
+
+```
+```{r, include=FALSE}
+#We estimate the random forest model and we get the tree
+model1<-randomForest(SalePrice~., data=train2, na.action=na.exclude)
+getTree(model1, 1)
+```
+ 
+```{r, echo=FALSE, comment=NA} 
+#Here it is the summary of our model
+ summary(model1)
+``` 
+##Step 3
+
+Once the predictions using random forest model are computed, they are plotted together with the predictions from the linear model obtained in Challenge A. It is possible to observe a diference between the two predictions. Moreover, in the linear model we obtained an important outlier that does not appear in this machine learning technique.
+
+```{r, include=FALSE}
+#We make predictions using the model1:
+prediction<-predict(model1, test2, type="response", norm.votes = TRUE)
+
+#we bind the predictions with with the Id
+prediction1<-cbind(test1$Id, prediction)
+
+#The column names of the dataset of both predicitons are changed:
+colnames(prediction1)<-c("Id","prediction")
+colnames(linear)<-c("Id","linpred")
+
+#Therefore we can proceed to merge both datasets by Id:
+prediction2<-merge(linear, prediction1, by="Id")
+
+#In order to use ggplot2 we need all the variables to be numeric so we run the following loop:
+prediction2[] <- lapply(prediction2, function(x) {
+    if(is.factor(x)) as.numeric(as.character(x)) else x})
+sapply(prediction2, class)
+```
+
+```{r, echo=FALSE, comment=NA}
+#Here is the graph of the comparition between the predictions we made with the linear model in Challenge A and the prediction we made with rainForest
+graph<-ggplot(prediction2, aes(x = Id)) + 
+  geom_line(aes(y = prediction), colour="blue", show.legend = TRUE) + 
+  geom_line(aes(y = linpred), colour = "red", show.legend = TRUE, linetype="dotted") + 
+  ylab(label="Prediction of SalePrice") + 
+  xlab("Id")+ 
+  ggtitle("Linear vs Random Forest Predicted Price")
+graph
+```
+
+
+
+
+
+#Task 2B - Overfitting in Machine Learning (continued)
+
+```{r, include=FALSE }
+
+#we create two datasets from the prvious challenge, storing the values for the training and test samples of the variables y and x
+training_ML<-read.csv(file="C:/Users/clara/rprog/Challenge B/training_ML.csv",header=T,dec=",")
+test_ML<-read.csv(file="C:/Users/clara/rprog/Challenge B/test_ML.csv",header=T,dec=",")
+
+#we convert the variables from factors to numeric for training
+training_ML[] <- lapply(training_ML, function(x) {
+    if(is.factor(x)) as.numeric(as.character(x)) else x})
+sapply(training_ML, class)
+
+#we convert the variables from factors to numeric for test
+test_ML[] <- lapply(test_ML, function(x) {
+    if(is.factor(x)) as.numeric(as.character(x)) else x})
+sapply(test_ML, class)
+
+#we save the colums of y and x from training as vectors
+y<-training_ML[,1]
+x<-training_ML[,2]
+
+#we save the colums of y and x from test as vectors
+yt<-test_ML[,1]
+xt<-test_ML[,2]
+
+```
+##Step 1
+By employing the training dataset a low flexibility local linear model is constructed. Summary is displayed below:
+```{r, echo=FALSE, comment=NA}
+
+#we estimate a low-flexibility local linear model on the training data
+ll.fit.lowflex<-npreg(y~x, bws=0.5, data=training_ML,regtype="ll")
+summary(ll.fit.lowflex)
+```
+
+## Step 2
+With the same procedure a high flexibility local linear model is created using the training dataset:
+```{r, echo=FALSE, comment=NA}
+
+#we estimate a low-flexibility local linear model on the test data
+ll.fit.highflex<-npreg(y~x, bws=0.01, data=training_ML,regtype="ll")
+summary(ll.fit.highflex)
+```
+
+##Step 3
+The following scatterplot reports the values of x and y and the prediction of the low (blue) and high (red) flexibility models in the training dataset.
+```{r, include=FALSE}
+
+#we compute the predictions of the low and high flexibility models on the training data
+fit_low<-predict(ll.fit.lowflex,data=training_ML)
+fit_high<-predict(ll.fit.highflex,data=training_ML)
+```
+
+```{r, echo=FALSE, comment=NA}
+
+#we create a graph with the variables y and x from the training data, we plot the predictions from the low and high flexibility models
+graph1<-ggplot() +
+  geom_point(aes(training_ML$x, training_ML$y)) +
+  geom_line(aes(training_ML$x, fit_low), color="blue", size=1) +
+  geom_line(aes(training_ML$x, fit_high), color="red", size=1)+
+  xlab("X - training")+
+  ylab("Y - training")
+graph1
+```
+
+##Step 4
+It is possible to observe that the high flexibility model leads to more variance in the predictions. On the other hand, the low flexibility model increases the bias i.e. the distance between the prediction and the value. Therefore, is necesssary to find the right balance between overfitting and underfitting respectively.
+
+##Step 5
+The following scatterplot presents the values of y and x along with the predictions of the high and low flexibility models in the test dataset.
+```{r, include=FALSE}
+#we compute the predictions of the low and high flexibility models on the test data
+fit_low_test<-predict(ll.fit.lowflex,newdata=test_ML)
+fit_high_test<-predict(ll.fit.highflex,newdata=test_ML)
+```
+
+```{r, echo=FALSE, comment=NA}
+
+graph2<-ggplot() +
+  geom_point(aes(test_ML$x, test_ML$y)) +
+  geom_line(aes(test_ML$x, fit_low_test), color="blue", size=1) +
+  geom_line(aes(test_ML$x, fit_high_test), color="red", size=1)+
+  xlab("X - test")+
+  ylab("Y - test")
+graph2
+```
+
+The high flexibility model has still the highest variance among predictions. Besides, being this the least biased model it can be seen that the fitted model does not addapt properly to the new sample. In fact, the original variance of the model does not reflect the variance of the new sample.
+
+
+##Step 6
+First of all, a vector with different bandwidths is created in order to construct models with different degrees of flexibility.
+```{r, include=FALSE}
+#we create a vector of different bandwidths
+bandwidth <- seq(0.01, 0.5, by = 0.001)
+
+```
+
+##Step 7
+A function was employed to creat a model for each value in the bandwidth interval in the training dataset.
+```{r,include=FALSE}
+#We create a model for each bandwith
+
+llbw.fit <- lapply(X = bandwidth, FUN = function(bandwidth) {npreg(y ~ x, bws = bandwidth, data = training_ML, method = "ll")})
+```
+
+##Step 8
+After computing the predictions in the training dataset for each model the mean squared error is computed.
+```{r, echo=FALSE, comment=NA}
+#First we compute the predicitions for all the models on the training dataset
+
+fit_all <- predict(llbw.fit, newdata=training_ML)
+fitall<-data.frame(fit_all)
+colnames(fitall)<-c(1:length(fitall))
+
+#We compute the MSE for each model
+
+MSE<- apply(fitall, 2, function(a){mean((a-y)^2)})
+summary(MSE)
+```
+
+##Step 9
+The previous step is repeated on the test dataset.
+```{r, include=FALSE}
+#We repeat the procedure for the test dataset
+
+fit_all1 <- predict(llbw.fit, newdata=test_ML)
+fitall1<-data.frame(fit_all1)
+colnames(fitall1)<-c(1:length(fitall1))
+
+MSE1<- apply(fitall1, 2, function(a){mean((a-yt)^2)})
+
+```
+
+
+#Step 10
+The following graph summarises how de MSE changes with respect to the bandwidth in the two samples i.e. blue for the training dataset and red for the test.
+It can be concluded that the MSE in the test dataset reaches a minimum for intermediate values of the bandwidht i.e. 0.2, instead in the training dataset the mean squared error is almost proportionally increasing with the bandwidth. Therefore it is preferable to use a value around the median of the bandwidth.
+```{r, echo=FALSE, comment=NA}
+#We plot the MSE for each model depending on the bandwidth with respect to the training and test samples
+
+graph3<-ggplot() +
+  geom_line(aes(bandwidth, MSE), color="blue", size=1) +
+  geom_line(aes(bandwidth, MSE1), color="red", size=1)+
+  xlab("Bandwidth")+
+  ylab("MSE")
+graph3
+```
+
+#Task 3B - Privacy regulation compliance in France
+
+##Step 1
+For the next steps the dataset CNIL will be employed.
+```{r, include=FALSE}
+CNIL <- read_delim("C:/Users/clara/rprog/Challenge B/CNIL.csv", 
+    ";", escape_double = FALSE, trim_ws = TRUE)
+```
+
+##Step 2
+The following table sumarizes how many organizations in France have adhered to the CNIL per department i.e. they have a CIL.
+```{r, echo=FALSE, comment=NA}
+#First we extract the department from the two first digits of the Code Postal
+department <- substr(CNIL$Code_Postal, 0, 2)
+
+#We create a vector of ones of the length of a column
+
+one<-c(1:length(CNIL$Siren))
+
+#We bind the pre-loaded dataset with the new columns
+
+cnil<-cbind(CNIL, department, one)
+
+#We sum the vector of ones by department
+count1<-aggregate(cnil$one, by=list(Category=cnil$department), FUN=sum)
+
+#We drop unclear data for the departments
+count2<-count1[- c(1, 99:108),]
+
+#We name our columns
+colnames(count2)<-c("Department","Number of organizations with CIL")
+
+#We create a table
+count3<-setDT(count2)
+count3
+```
+
+
+##Step 3
+First of all the dataset SIRC was imported. Then, it was merge whith the dataset cnil by the variable SIREN.
+```{r, include=FALSE}
+#We eliminate the vector of ones we used to count
+cnil1<-cnil[ , -which(names(cnil) %in% c("one"))]
+
+#We change the names of the variables to match SIREN
+colnames(cnil1)<-c("SIREN","Responsable", "Adresse", "Code_Postal", "Vile", "NAF", "TypeCIL", "Portee", "department")
+
+#We use this function to optimaze the reading of the huge dataset
+SIRC <- fread("C:/Users/clara/rprog/Challenge B/SIRC.csv")
+
+#In order to work with a vector of the more than 80Mb we used the following comand:
+memory.limit(10000000)
+
+#Then we merge cnil1 and SIRC by SIREN
+cnil2<-merge(cnil1,SIRC, by="SIREN")
+```
+
+##Step 4
+The dataset presents information on the employment size of the various companies. This variable is categorical with the numeric values that represent the size. In the histogram it is seen that companies that have employment size greater than 2000 employees (categories greater than 51 \footnote{https://www.sirene.fr/sirene/public/variable/tefen}) have the highes frequency.
+```{r, echo=FALSE, comment=NA }
+#We convert the variable from character to numeric
+TEFEN2<-as.numeric(cnil2$TEFEN)
+
+#We plot the histogram
+graph4<-hist(TEFEN2)
+graph4
+```
+
